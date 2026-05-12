@@ -223,6 +223,216 @@ Le projet devra respecter plusieurs principes de qualite :
 - Tests unitaires ou tests d'integration selon l'avancement
 - README complet permettant de comprendre et lancer le projet
 
+## Processus Git et approche DevOps
+
+Le projet utilisera une organisation Git simple avec trois branches principales :
+
+- **dev** : branche de developpement principale
+- **test** : branche de validation avant livraison
+- **main** : branche stable, correspondant a la version livrable
+
+### Role des branches
+
+#### Branche `dev`
+
+La branche `dev` est la seule branche sur laquelle les developpeurs peuvent pousser directement du code.
+
+Elle sert a integrer les nouvelles fonctionnalites, les corrections et les evolutions en cours de developpement.
+
+Exemples :
+
+```bash
+git checkout dev
+git pull origin dev
+git add .
+git commit -m "feat: add match listing"
+git push origin dev
+```
+
+#### Branche `test`
+
+La branche `test` sert a valider une version candidate avant la livraison finale.
+
+Les changements arrivent sur `test` uniquement via une Pull Request depuis `dev`.
+
+Objectifs de cette branche :
+
+- Executer la CI dans un contexte de validation
+- Tester les fonctionnalites integrees
+- Verifier que le backend et le frontend fonctionnent ensemble
+- Corriger les anomalies avant passage en production
+
+#### Branche `main`
+
+La branche `main` contient uniquement le code stable et livre.
+
+Aucun commit direct ne doit etre fait sur `main`. Les changements arrivent uniquement via une Pull Request depuis `test`, apres validation.
+
+### Flux de travail recommande
+
+Le flux Git recommande est le suivant :
+
+```text
+dev  ->  test  ->  main
+```
+
+1. Les developpeurs travaillent sur `dev`.
+2. La CI s'execute automatiquement sur `dev`.
+3. Quand une version est prete, une Pull Request est creee de `dev` vers `test`.
+4. La CI s'execute sur la Pull Request et sur la branche `test`.
+5. Apres validation, une Pull Request est creee de `test` vers `main`.
+6. La CI s'execute sur la Pull Request et sur la branche `main`.
+7. La branche `main` represente la version stable du projet.
+
+### Regles de protection GitHub recommandees
+
+Dans GitHub, il est recommande de configurer les regles suivantes dans :
+
+```text
+Settings > Branches > Branch protection rules
+```
+
+#### Protection de `main`
+
+- Interdire les commits directs
+- Exiger une Pull Request avant merge
+- Exiger que la CI soit en succes avant merge
+- Exiger au moins une validation de Pull Request
+- Interdire le force push
+- Interdire la suppression de la branche
+
+#### Protection de `test`
+
+- Interdire les commits directs
+- Exiger une Pull Request depuis `dev`
+- Exiger que la CI soit en succes avant merge
+- Interdire le force push
+- Interdire la suppression de la branche
+
+#### Branche `dev`
+
+- Autoriser les commits directs des membres de l'equipe
+- Executer la CI a chaque push
+- Interdire le force push si possible
+
+### Integration continue
+
+La CI devra s'executer automatiquement sur les trois branches :
+
+- `dev`
+- `test`
+- `main`
+
+Evenements recommandes :
+
+- A chaque `push` sur `dev`, `test` ou `main`
+- A chaque Pull Request vers `test` ou `main`
+
+Le pipeline CI pourra contenir les etapes suivantes :
+
+- Recuperation du code
+- Installation des dependances frontend
+- Verification du build Next.js
+- Execution des tests frontend
+- Installation des dependances backend
+- Execution des tests Spring Boot
+- Verification du build backend
+
+Exemple de workflow GitHub Actions cible :
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - test
+      - main
+  pull_request:
+    branches:
+      - test
+      - main
+
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('backend/pom.xml') != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run backend tests
+        working-directory: backend
+        run: ./mvnw test
+
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('frontend/package.json') != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+```
+
+Ce workflow pourra etre place dans :
+
+```text
+.github/workflows/ci.yml
+```
+
+### Convention de commits
+
+Pour garder un historique clair, le projet peut utiliser une convention de commits inspiree de Conventional Commits :
+
+```text
+feat: ajouter la liste des matchs
+fix: corriger le calcul du classement
+docs: mettre a jour le README
+test: ajouter les tests des services
+refactor: simplifier la gestion des scores
+ci: ajouter le workflow GitHub Actions
+```
+
+### Resume du processus
+
+```text
+Developpement quotidien : dev
+Validation fonctionnelle : test
+Version stable : main
+CI automatique : dev, test, main
+Commits directs : uniquement sur dev
+Pull Requests obligatoires : dev -> test, test -> main
+```
+
 ## Lancement du projet
 
 Les commandes de lancement seront completees lorsque les applications backend et frontend seront creees.
